@@ -167,7 +167,7 @@ def plot_weather_scatter(df: pd.DataFrame, outdir: str) -> str:
         bbox_to_anchor=(1.02, 0.0),
     )
 
-    outfile = os.path.join(outdir, "weather_scatter.png")
+    outfile = os.path.join(outdir, "weather_scatter_2.png")
     plt.tight_layout()
     plt.savefig(outfile, dpi=300)
     plt.close()
@@ -221,7 +221,7 @@ def plot_global_temp_heatmap(df: pd.DataFrame, outdir: str) -> str:
     plt.xlabel("Month")
     plt.ylabel("Year")
 
-    outfile = os.path.join(outdir, "global_temp_heatmap.png")
+    outfile = os.path.join(outdir, "global_temp_heatmap_2.png")
     plt.tight_layout()
     plt.savefig(outfile, dpi=300)
     plt.close()
@@ -260,7 +260,7 @@ def plot_minnesota_precip_line(df: pd.DataFrame, outdir: str) -> str:
     plt.ylabel("Precipitation (inches)")
     plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", title="Site")
 
-    outfile = os.path.join(outdir, "minnesota_precip_line.png")
+    outfile = os.path.join(outdir, "minnesota_precip_line_2.png")
     plt.tight_layout()
     plt.savefig(outfile, dpi=300)
     plt.close()
