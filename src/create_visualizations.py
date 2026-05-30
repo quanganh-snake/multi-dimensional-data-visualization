@@ -29,6 +29,7 @@ from typing import List
 
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import seaborn as sns
 import numpy as np
 
@@ -53,21 +54,29 @@ def plot_weather_heatmap(df: pd.DataFrame, outdir: str) -> str:
     str
         Path to the saved figure.
     """
-    # TODO: Students implement this function to generate "weather_heatmap.png"
-    #
-    # Instructions:
-    # 1. Compute the average monthly temperature for each city (group by 'city' and 'month', calculate mean of 'avg_temp').
-    # 2. Pivot the result to create a matrix with 'city' as index, 'month' as columns, and average temperature as values.
-    # 3. Ensure the columns (months) are sorted in calendar order.
-    # 4. Create a heatmap using seaborn.heatmap():
-    #    - Set figsize to (10, 4)
-    #    - Use 'coolwarm' colormap
-    #    - Add a colorbar with label "Average temperature"
-    #    - Enable annotations (annot=True) with float format '.1f'
-    # 5. Set title "Average monthly temperature by city", xlabel "Month", and ylabel "City".
-    # 6. Save the figure as "weather_heatmap.png" in outdir (using 300 dpi and tight layout) and return the saved file path.
+    monthly_avg = (
+        df.groupby(["city", "month"], as_index=False)["avg_temp"].mean()
+    )
+    heatmap_data = monthly_avg.pivot(index="city", columns="month", values="avg_temp")
+    heatmap_data = heatmap_data.reindex(sorted(heatmap_data.columns), axis=1)
 
-    raise NotImplementedError("plot_weather_heatmap is not implemented yet.")
+    plt.figure(figsize=(10, 4))
+    sns.heatmap(
+        heatmap_data,
+        cmap="coolwarm",
+        annot=True,
+        fmt=".1f",
+        cbar_kws={"label": "Average temperature"},
+    )
+    plt.title("Average monthly temperature by city")
+    plt.xlabel("Month")
+    plt.ylabel("City")
+
+    outfile = os.path.join(outdir, "weather_heatmap_2.png")
+    plt.tight_layout()
+    plt.savefig(outfile, dpi=300)
+    plt.close()
+    return outfile
 
 
 def plot_weather_scatter(df: pd.DataFrame, outdir: str) -> str:
@@ -93,30 +102,76 @@ def plot_weather_scatter(df: pd.DataFrame, outdir: str) -> str:
     str
         Path to the saved figure.
     """
-    # TODO: Students implement this function to generate "weather_scatter.png"
-    #
-    # Instructions:
-    # 1. Clean the 'precip' column by converting it to numeric (coercing errors to NaN) and filling missing values with 0.0.
-    # 2. Set up the figure with figsize=(9, 6).
-    # 3. Set a marker size range, e.g., size_range = (20, 300).
-    # 4. Generate a scatter plot using seaborn.scatterplot():
-    #    - x-axis: "avg_humidity" (Label: "Average relative humidity (%)")
-    #    - y-axis: "avg_temp" (Label: "Average temperature (°F)")
-    #    - hue: "city"
-    #    - size: "precip" with sizes=size_range
-    #    - Use alpha=0.65 for transparency
-    #    - Hide the default legend to draw custom separate legends (legend=False)
-    # 5. Create a custom legend for the cities (hue):
-    #    - Draw circles with corresponding colors using matplotlib.lines.Line2D.
-    #    - Place it at loc="upper left", bbox_to_anchor=(1.02, 1.0) with title "City".
-    # 6. Create a custom legend for precipitation sizes (size):
-    #    - Choose representative quantiles/values of precip (e.g. 4 values from 0 to max).
-    #    - Use plt.scatter() with proportional sizes mapped using np.interp to size_range.
-    #    - Place it at loc="lower left", bbox_to_anchor=(1.02, 0.0) with title "Precipitation".
-    # 7. Add title "Daily weather: temperature vs humidity with precipitation (size)".
-    # 8. Save the figure as "weather_scatter.png" in outdir (using 300 dpi and tight layout) and return the saved file path.
+    plot_df = df.copy()
+    plot_df["precip"] = pd.to_numeric(plot_df["precip"], errors="coerce").fillna(0.0)
 
-    raise NotImplementedError("plot_weather_scatter is not implemented yet.")
+    plt.figure(figsize=(9, 6))
+    size_range = (20, 300)
+    city_order = sorted(plot_df["city"].dropna().unique())
+    palette = sns.color_palette(n_colors=len(city_order))
+    color_map = dict(zip(city_order, palette))
+
+    ax = sns.scatterplot(
+        data=plot_df,
+        x="avg_humidity",
+        y="avg_temp",
+        hue="city",
+        hue_order=city_order,
+        palette=color_map,
+        size="precip",
+        sizes=size_range,
+        alpha=0.65,
+        legend=False,
+    )
+
+    plt.xlabel("Average relative humidity (%)")
+    plt.ylabel("Average temperature (°F)")
+    plt.title("Daily weather: temperature vs humidity with precipitation (size)")
+
+    city_handles = [
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            linestyle="",
+            markerfacecolor=color_map[city],
+            markeredgecolor="none",
+            markersize=7,
+            label=city,
+        )
+        for city in city_order
+    ]
+    legend_city = plt.legend(
+        handles=city_handles,
+        title="City",
+        loc="upper left",
+        bbox_to_anchor=(1.02, 1.0),
+    )
+    ax.add_artist(legend_city)
+
+    precip_max = float(plot_df["precip"].max())
+    if precip_max > 0:
+        precip_values = np.linspace(0, precip_max, 4)
+    else:
+        precip_values = np.array([0.0, 0.0, 0.0, 0.0])
+    mapped_sizes = np.interp(precip_values, [0, max(precip_max, 1e-9)], size_range)
+
+    size_handles = [
+        plt.scatter([], [], s=size, color="gray", alpha=0.65, label=f"{value:.2f}")
+        for value, size in zip(precip_values, mapped_sizes)
+    ]
+    plt.legend(
+        handles=size_handles,
+        title="Precipitation",
+        loc="lower left",
+        bbox_to_anchor=(1.02, 0.0),
+    )
+
+    outfile = os.path.join(outdir, "weather_scatter.png")
+    plt.tight_layout()
+    plt.savefig(outfile, dpi=300)
+    plt.close()
+    return outfile
 
 
 def plot_global_temp_heatmap(df: pd.DataFrame, outdir: str) -> str:
@@ -137,26 +192,40 @@ def plot_global_temp_heatmap(df: pd.DataFrame, outdir: str) -> str:
     str
         Path to the saved figure.
     """
-    # TODO: Students implement this function to generate "global_temp_heatmap.png"
-    #
-    # Instructions:
-    # 1. Reshape the dataframe from wide to long format using pandas.melt():
-    #    - Keep 'Year' as id_vars, and months 'Jan' to 'Dec' as value_vars.
-    #    - Name the variable column "Month" and value column "Anomaly".
-    # 2. Map Month abbreviations to month numbers (1 to 12) so they are sorted chronologically.
-    # 3. Pivot the long dataframe back to a matrix with 'Year' as index, 'MonthNum' as columns, and 'Anomaly' as values.
-    # 4. Ensure the matrix is sorted by year index in ascending order.
-    # 5. Set up the figure with figsize=(10, 8).
-    # 6. Draw a heatmap using seaborn.heatmap():
-    #    - Use colormap 'coolwarm'
-    #    - Set colormap limits to vmin=-1.5 and vmax=1.5
-    #    - Set cbar_kws with label "Temperature anomaly (°C relative to 1951–1980)"
-    #    - Set linewidths=0 and linecolor="white"
-    # 7. Customize x-ticks to display month abbreviations ('Jan' to 'Dec') rotated by 45 degrees.
-    # 8. Set title "Global land–ocean temperature anomalies (1880–2025)", xlabel "Month", and ylabel "Year".
-    # 9. Save the figure as "global_temp_heatmap.png" in outdir (using 300 dpi and tight layout) and return the saved file path.
+    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    long_df = df.melt(
+        id_vars="Year",
+        value_vars=months,
+        var_name="Month",
+        value_name="Anomaly",
+    )
 
-    raise NotImplementedError("plot_global_temp_heatmap is not implemented yet.")
+    month_to_num = {month: idx for idx, month in enumerate(months, start=1)}
+    long_df["MonthNum"] = long_df["Month"].map(month_to_num)
+    heatmap_data = long_df.pivot(index="Year", columns="MonthNum", values="Anomaly")
+    heatmap_data = heatmap_data.sort_index()
+
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(
+        heatmap_data,
+        cmap="coolwarm",
+        vmin=-1.5,
+        vmax=1.5,
+        cbar_kws={"label": "Temperature anomaly (°C relative to 1951–1980)"},
+        linewidths=0,
+        linecolor="white",
+    )
+
+    plt.xticks(ticks=np.arange(0.5, 12.5, 1), labels=months, rotation=45, ha="right")
+    plt.title("Global land–ocean temperature anomalies (1880–2025)")
+    plt.xlabel("Month")
+    plt.ylabel("Year")
+
+    outfile = os.path.join(outdir, "global_temp_heatmap.png")
+    plt.tight_layout()
+    plt.savefig(outfile, dpi=300)
+    plt.close()
+    return outfile
 
 
 def plot_minnesota_precip_line(df: pd.DataFrame, outdir: str) -> str:
@@ -179,20 +248,23 @@ def plot_minnesota_precip_line(df: pd.DataFrame, outdir: str) -> str:
     str
         Path to the saved figure.
     """
-    # TODO: Students implement this function to generate "minnesota_precip_line.png"
-    #
-    # Instructions:
-    # 1. Create a datetime column named 'date' combining 'year' and 'mo' (month) with day set to 1.
-    # 2. Set up the figure with figsize=(10, 6).
-    # 3. Create a line plot using seaborn.lineplot():
-    #    - x-axis: "date" (Label: "Year")
-    #    - y-axis: "precip" (Label: "Precipitation (inches)")
-    #    - hue: "site"
-    # 4. Set title "Monthly precipitation by Minnesota site (1927–1936)".
-    # 5. Place the legend outside the plot box on the upper right: bbox_to_anchor=(1.05, 1), loc="upper left", title="Site".
-    # 6. Save the figure as "minnesota_precip_line.png" in outdir (using 300 dpi and tight layout) and return the saved file path.
+    plot_df = df.copy()
+    plot_df["date"] = pd.to_datetime(
+        {"year": plot_df["year"], "month": plot_df["mo"], "day": 1}
+    )
 
-    raise NotImplementedError("plot_minnesota_precip_line is not implemented yet.")
+    plt.figure(figsize=(10, 6))
+    sns.lineplot(data=plot_df, x="date", y="precip", hue="site")
+    plt.title("Monthly precipitation by Minnesota site (1927–1936)")
+    plt.xlabel("Year")
+    plt.ylabel("Precipitation (inches)")
+    plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", title="Site")
+
+    outfile = os.path.join(outdir, "minnesota_precip_line.png")
+    plt.tight_layout()
+    plt.savefig(outfile, dpi=300)
+    plt.close()
+    return outfile
 
 
 def main() -> List[str]:
